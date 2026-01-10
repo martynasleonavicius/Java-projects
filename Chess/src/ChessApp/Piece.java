@@ -46,6 +46,10 @@ public abstract class Piece {
         return y;
     }
 
+    public void setX(int x){this.x = x;}
+
+    public void setY(int y){this.y = y;}
+
     //This method sets the figure's visual in the new place.
     public void move(int newX, int newY){
         x = newX;
@@ -56,23 +60,43 @@ public abstract class Piece {
 
 
     //The following functions are useful for tower, bishop, king, and queen figures. That is why we put them here
-    public boolean addingPossibleMovesAlongTheXOrYDirection(int x, int y, List<List<Integer>> movesUnderConsideration, boolean areWeConsideringActualMoves){
+    public boolean addingPossibleMovesAlongTheXOrYDirection(int x, int y, List<List<Integer>> movesUnderConsideration, boolean isThisPawn, boolean pawnAttackConsideration){
         //Let us first check if the inputs are still inbounds of the board. If not, we'll break the for-loop
         if (x >= 8 || x < 0 || y >= 8 || y < 0){
             return false;
         }
 
+        //The following few lines address a special case when a pawn captures an enemy pawn via en passant
+        if(isThisPawn && pawnAttackConsideration){
+            pawnTakesEnPassant(x, y, movesUnderConsideration);
+        }
 
         boolean doWeNeedToStop = false;
         //We add all the empty places as possible spots to occupy
+        //Make sure that the pawns cannot move sideways. By the rules we have already implemented, the pawn can only move to the side if and only if it is attaking an enemy piece
         if (Main.piecesOnBoard[x][y] == null){
-            addPossibleMovesToAReturnArray(x, y, movesUnderConsideration, areWeConsideringActualMoves);
+            if (!pawnAttackConsideration && isThisPawn){
+                addPossibleMovesToAReturnArray(x, y, movesUnderConsideration);
+            }
+            if (!isThisPawn){
+                addPossibleMovesToAReturnArray(x, y, movesUnderConsideration);
+            }
         }
+
         //Check for pieces. Remember that the piece can take opposite colour pieces, hence we allow a possible move on the nearest enemy piece
         else if (Main.piecesOnBoard[x][y].getColour() != this.getColour()){
-            addPossibleMovesToAReturnArray(x, y, movesUnderConsideration, areWeConsideringActualMoves);
-            doWeNeedToStop = true;
+            if (!isThisPawn){
+                addPossibleMovesToAReturnArray(x, y, movesUnderConsideration);
+                doWeNeedToStop = true;
+            }
+            if (isThisPawn && pawnAttackConsideration){
+                addPossibleMovesToAReturnArray(x, y, movesUnderConsideration);
+                doWeNeedToStop = true;
+            }
         }
+
+
+
         //If the piece is the same colour, then we stop the process
         else {
             doWeNeedToStop = true;
@@ -80,32 +104,36 @@ public abstract class Piece {
         return doWeNeedToStop;
     }
 
+    public void pawnTakesEnPassant(int x, int y,  List<List<Integer>> movesUnderConsideration){
+        List<Integer> position = new ArrayList<>();
+        position.add(x);
+        position.add(y);
+        //System.out.println(Main.enPassantSquares);
+        //System.out.println(Main.enPassantSquares.contains(position));
+
+        if (Main.enPassantSquares.contains(position) && !checkIfKingInCheck(x, y)){
+            movesUnderConsideration.add(position);
+            //System.out.println("pTEP: " + movesUnderConsideration);
+        }
+    }
+
     //Because the king checks possible positions over which it can be attacked, checkIfInCheck is getting called again.
-    //That causes infinite recursion. That is why we need to use areWeConsideringActualMoves variable.
-    //areWeConsideringActualMoves = true means we are generating possible moves of a regular piece. false is for finding if the king is in check
-    //areWeConsideringActualMoves variable avoids infinite recursion.
-    public void addPossibleMovesToAReturnArray(int x, int y, List<List<Integer>> movesUnderConsideration, boolean areWeConsideringActualMoves){
+    //As we need special consideration for the pawns, we will use a boolean variable to record which piece we are moving!
+    public void addPossibleMovesToAReturnArray(int x, int y, List<List<Integer>> movesUnderConsideration){
         List<Integer> position = new ArrayList<>();
         position.add(x);
         position.add(y);
 
         //Let us add the possible move it does not put our king into a check
-
-
-        if(areWeConsideringActualMoves && !checkIfInCheck(x, y)){
-            movesUnderConsideration.add(position);
-        }
-
-        //Add an "if" statement that add the attacking moves
-        if (!areWeConsideringActualMoves){
+        if(!checkIfKingInCheck(x, y)){
             movesUnderConsideration.add(position);
         }
     }
 
     //For each possible move, this method checks if the king is in check after it.
-    private boolean checkIfInCheck(int x, int y){
-        int currentX = this.getX();
-        int currentY = this.getY();
+    private boolean checkIfKingInCheck(int x, int y){
+        //int currentX = this.x;
+        //int currentY = this.y;
 
         //Let us make a simple copy of the current board. We will only use string representation of the pieces
         String[][] simpleBoard = new String[8][8];
@@ -124,63 +152,47 @@ public abstract class Piece {
             }
         }
 
-        //If the potential move takes an enemy piece, let us save it to put it back in place when we are done checking
-        Piece keepInMind = Main.piecesOnBoard[x][y];
-        //Make the possible move
-        Main.piecesOnBoard[x][y] = Main.piecesOnBoard[currentX][currentY];
-        Main.piecesOnBoard[x][y].move(x, y);
-        Main.piecesOnBoard[currentX][currentY] = null;
-
-        List<List<Integer>> temp = new ArrayList<>();
-
-        boolean doesThisPutKingInCheck = false;
-        //Check if the move puts YOUR king in check
-        if (this.getColour() == Turn.WHITE){
-            doesThisPutKingInCheck = Main.whiteKing.getIsInCheck();
-            temp.addAll(Main.whiteKing.getPositionsOverWhichTheKingCanBeAttacked());
-            Main.whiteKing.cureCheck();
+        if (colour == Turn.WHITE){
+            Main.whiteKing.setSimpleBoard(simpleBoard);
+            return Main.whiteKing.checkIfInCheck(this.x, this.y, x, y);
         }
-        else{
-            doesThisPutKingInCheck = Main.blackKing.getIsInCheck();
-            temp.addAll(Main.blackKing.getPositionsOverWhichTheKingCanBeAttacked());
-            Main.blackKing.cureCheck();
+        else {
+            Main.blackKing.setSimpleBoard(simpleBoard);
+            return Main.blackKing.checkIfInCheck(this.x, this.y, x, y);
         }
-        //reverse the move
-        Main.piecesOnBoard[currentX][currentY] = Main.piecesOnBoard[x][y];
-        Main.piecesOnBoard[currentX][currentY].move(currentX, currentY);
-        //Now put enemy piece back in its place
-        Main.piecesOnBoard[x][y] = keepInMind;
 
-        System.out.println(doesThisPutKingInCheck);
-        System.out.println("Attack positions: " + temp);
-        //Return the result
-        return doesThisPutKingInCheck;
     }
+
 
     //For the majority of pieces, we will use the list allPossibleMoves to show where the selected piece can be placed.
-    //But we want to utilise these existing functions to see if the king is in check.
-    //We thus leverage method overloading.
+    //We thus use method overloading.
     //This function receives a direction in which it has look for possible moves. Say [-1, 0] will consider possible moves to the left of the piece
-    public void setDirectionToConsider(int[] directionToConsider, int limit, List<List<Integer>> movesUnderConsideration, boolean areWeConsideringActualMoves){
+    public void setDirectionToConsider(int[] directionToConsider, int limit, List<List<Integer>> movesUnderConsideration, boolean isThisPawn, boolean pawnAttackConsideration){
         for (int i = 1; i < limit ;i++){
-            if (addingPossibleMovesAlongTheXOrYDirection(this.getX() + i * directionToConsider[0], this.getY() + i * directionToConsider[1], movesUnderConsideration, areWeConsideringActualMoves)) break;
+            if (addingPossibleMovesAlongTheXOrYDirection(this.getX() + i * directionToConsider[0], this.getY() + i * directionToConsider[1], movesUnderConsideration, isThisPawn, pawnAttackConsideration)) break;
         }
 
     }
 
-    public List<List<Integer>> getDirectionToConsider(int[] directionToConsider, int limit){
-        List<List<Integer>> tempEnemyAttack = new ArrayList<>();
-        setDirectionToConsider(directionToConsider, limit, tempEnemyAttack,false);
-        return tempEnemyAttack;
+    //Used for castling.
+    public List<List<Integer>> getSpecialMovesForCastling(int[] directionToConsider, int limit){
+        List<List<Integer>> temp = new ArrayList<>();
+        setDirectionToConsider(directionToConsider, limit, temp, false, false);
+        return temp;
+    }
+
+    //We introduce isThisPawn and pawnAttackConsideration flags, as they require different moves to other chess pieces
+    public void pawnDirectionConsiderations(int[] directionToConsider, int limit,  boolean pawnAttackConsideration){
+        setDirectionToConsider(directionToConsider, limit, allPossibleMoves, true, pawnAttackConsideration);
     }
 
     public void setDirectionToConsider(int[] directionToConsider, int limit){
-        setDirectionToConsider(directionToConsider, limit, allPossibleMoves, true);
+        setDirectionToConsider(directionToConsider, limit, allPossibleMoves, false, false);
     }
 
     //we use method overloading for pieces which cannot go across the board fully, like the king.
     public void setDirectionToConsider(int[] directionToConsider){
-        setDirectionToConsider(directionToConsider, 10, allPossibleMoves, true);
+        setDirectionToConsider(directionToConsider, 10, allPossibleMoves, false, false);
     }
 
     //method returning class

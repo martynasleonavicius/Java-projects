@@ -12,142 +12,64 @@ public class Pawn extends Piece{
         isFirstMove = true;
     }
 
-    //We need to calculate the possible moves differently if it is the first movement of the piece
-    //Not meant to be accessed outside this class
-    private List<List<Integer>> firstMove(){
-        List <List<Integer>> possibleMoves = new ArrayList<>();
-        List <Integer> positions = new ArrayList<>();
-        int x = super.getX();
-        int y = super.getY();
-
-        //Calculates possible positions.
-        for (int i = 0; i < 2 && i + y < Main.WIDTH/8; i++){
-            positions = new ArrayList<>();
-
-            //If we have a white piece, it needs to go down (y increases)
-            if (this.getColour() == Turn.WHITE){
-                y++;
-            }
-            //Black piece go up the board (y decreases)
-            else{
-                y--;
-            }
-
-            //We omit any moves that might require us to move into an occupied square
-            if (Main.piecesOnBoard[x][y] != null){
-                break;
-            }
-
-            //Otherwise we can easily consider them
-            positions.add(x);
-            positions.add(y);
-
-            possibleMoves.add(positions);
-        }
-
-        return possibleMoves;
-    }
-
-    //Regular moves involve moving the pawn 1 square up.
-    //Not meant to be accessed outside this class
-    private List<List<Integer>> regularMoves(){
-        List<List<Integer>> possibleMoves = new ArrayList<>();
-        List <Integer> positions = new ArrayList<>();
-        positions.add(super.getX());
-
-        //White move down the window (y increases)
-        if (this.getColour() == Turn.WHITE){
-            positions.add(super.getY()+1);
-        }
-        //Black moves up the window (y decreases)
-        else{
-            positions.add(super.getY()-1);
-        }
-
-        //Here we only add possible move if the square in front is free
-        if (Main.piecesOnBoard[positions.get(0)][positions.get(1)] == null){
-            possibleMoves.add(positions);
-        }
-
-        return possibleMoves;
-    }
-
-    //Cheks if there are any pieces that can be taken to the left of the pawn
-    //keep this public in case I want to paint the attackable pieces a different color
-    public List <List<Integer>> piecesToBeAttackedOnLeft() throws Exception{
-        List<List<Integer>> squaresThatCanBeAttacked = new ArrayList<>();
-        List<Integer> positions = new ArrayList<>();
-
-        //The following possible attack squares are only valid for black pawns
-        if (this.getColour() == Turn.BLACK){
-            //Check if anything exists to the top right of the black piece and if it has the opposite color to it
-            if (Main.piecesOnBoard[super.getX() - 1][super.getY() - 1] != null && Main.piecesOnBoard[super.getX() - 1][super.getY() - 1].getColour() != this.getColour()) {
-                positions.add(super.getX() - 1);
-                positions.add(super.getY() - 1);
-                squaresThatCanBeAttacked.add(positions);
-            }
-        }
-        //And now for white pieces
-        else{
-
-            if (Main.piecesOnBoard[super.getX() + 1][super.getY() +1] != null && Main.piecesOnBoard[super.getX() + 1][super.getY() + 1].getColour() != this.getColour()) {
-                positions.add(super.getX() + 1);
-                positions.add(super.getY() + 1);
-                squaresThatCanBeAttacked.add(positions);
-            }
-        }
-
-        return squaresThatCanBeAttacked;
-    }
-
-    //Now check the same thing to the right
-    public List <List<Integer>> piecesToBeAttackedOnRight() throws Exception{
-        List<List<Integer>> squaresThatCanBeAttacked = new ArrayList<>();
-        List<Integer> positions = new ArrayList<>();
-
-        if (this.getColour() == Turn.BLACK){
-            //Check if anything exists to the top right of the black piece and if it has the opposite color to it
-            if (Main.piecesOnBoard[super.getX() + 1][super.getY() - 1] != null && Main.piecesOnBoard[super.getX() + 1][super.getY() - 1].getColour() != this.getColour()) {
-                positions.add(super.getX() + 1);
-                positions.add(super.getY() - 1);
-                squaresThatCanBeAttacked.add(positions);
-            }
-        }
-        //And now  check for white pieces
-        else{
-            if (Main.piecesOnBoard[super.getX() - 1][super.getY() + 1] != null && Main.piecesOnBoard[super.getX() - 1][super.getY() + 1].getColour() != this.getColour()){
-                positions.add(super.getX() - 1);
-                positions.add(super.getY() + 1);
-                squaresThatCanBeAttacked.add(positions);
-            }
-        }
-        return squaresThatCanBeAttacked;
-    }
-
-
     @Override
     public List<List<Integer>> possibleMoves() {
-        //If it is the 1st time the pawn is moving, we need to show the ability to move 2 tiles up
-        List<List<Integer>> allPossibleMoves = new ArrayList<>();
-
-        if ((super.getY() == 1 && this.getColour() == Turn.WHITE)|| (super.getY() == 6) && this.getColour() == Turn.BLACK) {
-            allPossibleMoves = firstMove();
-        }
-        //If it is not, then we just regular pawn movements
-        else {
-            allPossibleMoves = regularMoves();
+        allPossibleMoves.clear();
+        //This variable determines which direction we consider for moving. 1 will be for white pawns, -1 for black. Remember, Y direction goes from top down on screen
+        int direction = 1;
+        if (this.getColour() == Turn.BLACK){
+            direction *= -1;
         }
 
-        //Now add all the pieces that can be attacked. ArrayIndexOutOfBoundsError is thrown if the place that is being checked is outside the board. We shall ignore them
-        try {
-            allPossibleMoves.addAll(piecesToBeAttackedOnLeft());
-        } catch(Exception e){}
-        try{
-            allPossibleMoves.addAll(piecesToBeAttackedOnRight());
-        } catch(Exception e) {}
+        //When the pawn moves for the first time, it may move 2 spaces forward
+        int limit = 2;
+        if (isFirstMove){
+            limit = 3;
+        }
 
-
+        //This is for considering forward, non-attacking positions. false flag is making sure we are only considering non-attacking positions
+        this.pawnDirectionConsiderations(new int[]{0, direction}, limit, false);
+        //Now let us consider the attacking positions...
+        //to the left
+        this.pawnDirectionConsiderations(new int[]{1, direction}, 2, true);
+        //...and to the right
+        this.pawnDirectionConsiderations(new int[]{-1, direction}, 2, true);
         return allPossibleMoves;
+    }
+
+    //WE must override superclass move method, so that we could change isFirstMove flag to false after the first move was made
+    @Override
+    public void move(int newX, int newY){
+        if (isFirstMove) enPassant(newY);
+        super.move(newX, newY);
+        isFirstMove = false;
+        arrivedAtTheEnd(newY);
+        //System.out.println(this.getX() + " " + this.getY());
+    }
+
+    //Create a method which tracks if the pawn moves enough squares to be vulnerable for en passant
+    private void enPassant(int newY){
+        int delta = this.getY() - newY;
+        List<Integer> position = new ArrayList<>();
+        position.add(getX());
+        //Only white pawns could have a +ve delta
+        //System.out.println(delta);
+        if (delta > 0){
+            position.add(newY+1);
+            Main.enPassantSquares.add(position);
+        }
+        if (delta < 0){
+            position.add(newY-1);
+            Main.enPassantSquares.add(position);
+        }
+        //System.out.println(Main.enPassantSquares);
+    }
+
+    //If the pawn has reached the other side of the board, we must trigger new piece selection piece method
+    private void arrivedAtTheEnd(int newY){
+        if (newY == 7 || newY == 0){
+            Main.choseNewPiece(this.getX(), this.getY());
+        }
     }
 
     public char returnClass(){

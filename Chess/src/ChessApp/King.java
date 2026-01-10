@@ -21,7 +21,7 @@ public class King extends Piece{
         //stores spaces occupied during castling
         specialMoves = new ArrayList<>();
 
-        //Initialize a list which stores the directions trough which the king can be attacked
+        //Initialize a list which stores the directions trough which the king can be attacked. Use hashet to avoid duplication
         positionsOverWhichTheKingCanBeAttacked = new HashSet<>();
 
         //Initialise isInCheck flag
@@ -76,10 +76,7 @@ public class King extends Piece{
         int limit = 2;
         allPossibleMoves.clear();
 
-        //We first check if we can rook to the left
-        castle(0);
-        //Then the right
-        castle(7);
+
 
         //We now try to look for available spaces to the left
         this.setDirectionToConsider(new int[]{-1, 0}, limit);
@@ -97,6 +94,11 @@ public class King extends Piece{
         this.setDirectionToConsider(new int[]{1, 1}, limit);
         //down left
         this.setDirectionToConsider(new int[]{-1, 1}, limit);
+
+        //We first check if we can rook to the left
+        castle(0);
+        //Then the right
+        castle(7);
         return allPossibleMoves;
     }
 
@@ -106,12 +108,12 @@ public class King extends Piece{
             return;
         }
 
-        //We declare a new object. This is just a place holder for we want to know if we actually have a rook to our left
+        System.out.println(allPossibleMoves.size());
+        //We declare a new object. This is just a placeholder for we want to know if we actually have a rook to our left
         Object obj = new Object();
 
-        // Check the other one of the castles on the same rank
+        // Check if the other one of the rooks are on the same rank
         if (Main.piecesOnBoard[x][this.getY()] == null) {
-            System.out.println("X: " + x + " this.getY() " + this.getY() + " pirmas testas nepavyko ");
             return;
         }
 
@@ -119,31 +121,34 @@ public class King extends Piece{
         //To avoid any errors, we extract it as a superclass object. Thankfully, it turns into the original class we declared the object to be
         obj = (Piece) Main.piecesOnBoard[x][getY()];
         if (obj.getClass() != Tower.class || ((Piece) obj).getColour() != this.getColour() || !((Tower) obj).getIsFirstMove()){
-            System.out.println("X: " + x + " this.getY() " + this.getY() + " antras testas nepavyko ");
             return;
         }
+
+        // Check if there is a check preventing the king from castling
+
 
         //Checks if the squares between the king and the rook are empty. If not, do nothing
         int direction = x==7? -1 : 1;
         for (int i = direction; this.getX() - i < 7 && this.getX() - i > 0; i += direction){
             if (Main.piecesOnBoard[this.getX() - i][this.getY()] != null){
-                System.out.println("X: " + x + " this.getY() " + this.getY() + " trecias testas nepavyko ");
                 return;
             }
         }
 
-        //After all these tests for castling have past, add the special castling move
-        //This one is for castling to the right
-        List<Integer> position = new ArrayList<>();
-        if (x == 0){
-            position.add(1);
+        //After all these tests for castling have past, add the special castling moves.
+        // This will automatically check if the king is put in check or might traverse a check.
+        List<List<Integer>> movesRight = this.getSpecialMovesForCastling(new int[]{-1, 0}, 3);
+        if (movesRight.size() > 1){
+            allPossibleMoves.addAll(movesRight);
+            //specialMoves contains only the moves for castling. We need to save them, so that we would be able to switch the rook and the king
+            specialMoves.add(movesRight.get(movesRight.size() - 1));
         }
-        else{
-            position.add(5);
+        List<List<Integer>> movesLeft = this.getSpecialMovesForCastling(new int[]{1, 0}, 3);
+        if (movesRight.size() > 1){
+            allPossibleMoves.addAll(movesLeft);
+            specialMoves.add(movesLeft.get(movesLeft.size() - 1));
         }
-        position.add(this.getY());
-        specialMoves.add(position);
-        allPossibleMoves.addAll(specialMoves);
+
     }
 
     //This method checks all possible attack positions of the king.
@@ -233,18 +238,10 @@ public class King extends Piece{
         }
     }
 
-    public Set<List<Integer>> getPositionsOverWhichTheKingCanBeAttacked(){
-        return positionsOverWhichTheKingCanBeAttacked;
-    }
 
     public void cureCheck(){
         positionsOverWhichTheKingCanBeAttacked.clear();
         isInCheck = false;
-    }
-
-    public boolean getIsInCheck(){
-        kingAttackPositions();
-        return !positionsOverWhichTheKingCanBeAttacked.isEmpty();
     }
 
     public void setSimpleBoard(String[][] simpleBoard){
@@ -261,18 +258,18 @@ public class King extends Piece{
     //Here we add the method to see if the
     public List<List<Integer>> getCheckDirectionToConsider(int[] directionToConsider, int limit){
         List<List<Integer>> tempEnemyAttack = new ArrayList<>();
-        setDirectionToConsider(directionToConsider, limit, tempEnemyAttack);
+        setCheckDirectionToConsider(directionToConsider, limit, tempEnemyAttack);
         return tempEnemyAttack;
     }
 
-    public void setDirectionToConsider(int[] directionToConsider, int limit, List<List<Integer>> movesUnderConsideration){
+    public void setCheckDirectionToConsider(int[] directionToConsider, int limit, List<List<Integer>> movesUnderConsideration){
         for (int i = 1; i < limit ;i++){
-            if (addingPossibleMovesAlongTheXOrYDirection(this.getX() + i * directionToConsider[0], this.getY() + i * directionToConsider[1], movesUnderConsideration)) break;
+            if (addingPossibleAttackMoves(this.getX() + i * directionToConsider[0], this.getY() + i * directionToConsider[1], movesUnderConsideration)) break;
         }
 
     }
 
-    public boolean addingPossibleMovesAlongTheXOrYDirection(int x, int y, List<List<Integer>> movesUnderConsideration){
+    public boolean addingPossibleAttackMoves(int x, int y, List<List<Integer>> movesUnderConsideration){
         //Let us first check if the inputs are still inbounds of the board. If not, we'll break the for-loop
         if (x >= 8 || x < 0 || y >= 8 || y < 0){
             return false;
@@ -282,11 +279,11 @@ public class King extends Piece{
         boolean doWeNeedToStop = false;
         //We add all the empty places as possible spots to occupy
         if (simpleBoard[x][y].charAt(0) == 'O'){
-            addPossibleMovesToAReturnArray(x, y, movesUnderConsideration);
+            addPossibleAttackMovesToAReturnArray(x, y, movesUnderConsideration);
         }
         //Check for pieces. Remember that the piece can take opposite colour pieces, hence we allow a possible move on the nearest enemy piece
         else if (simpleBoard[x][y].charAt(1) != (this.getColour() == Turn.WHITE? 'W':'B')){
-            addPossibleMovesToAReturnArray(x, y, movesUnderConsideration);
+            addPossibleAttackMovesToAReturnArray(x, y, movesUnderConsideration);
             doWeNeedToStop = true;
         }
         //If the piece is the same colour, then we stop the process
@@ -296,7 +293,7 @@ public class King extends Piece{
         return doWeNeedToStop;
     }
 
-    public void addPossibleMovesToAReturnArray(int x, int y, List<List<Integer>> movesUnderConsideration){
+    public void addPossibleAttackMovesToAReturnArray(int x, int y, List<List<Integer>> movesUnderConsideration){
         List<Integer> position = new ArrayList<>();
         position.add(x);
         position.add(y);
@@ -306,37 +303,50 @@ public class King extends Piece{
     }
 
 
-    private boolean checkIfInCheck(int x, int y){
-        int currentX = this.getX();
-        int currentY = this.getY();
+    public boolean checkIfInCheck(int fromX, int fromY, int x, int y){
+        int oldKingX = -1;
+        int oldKingY = -1;
 
+        //Special consideration for the king. We must use its updated coordinates during the potential move
+        if (fromX == this.getX() && fromY == this.getY()){
+            oldKingY = this.getY();
+            oldKingX = this.getX();
+            this.setX(x);
+            this.setY(y);
+        }
 
         //If the potential move takes an enemy piece, let us save it to put it back in place when we are done checking
         String keepInMind = simpleBoard[x][y];
         //Make the possible move
-        simpleBoard[x][y] = simpleBoard[currentX][currentY];
-        simpleBoard[currentX][currentY] = "O";
+        simpleBoard[x][y] = simpleBoard[fromX][fromY];
+        simpleBoard[fromX][fromY] = "O";
 
         //List<List<Integer>> temp = new ArrayList<>();
-
-        boolean doesThisPutKingInCheck = false;
         kingAttackPositions();
+        boolean doesThisPutKingInCheck = !positionsOverWhichTheKingCanBeAttacked.isEmpty();
         //Check if the move puts YOUR king in check
-        if (this.getColour() == Turn.WHITE){
+        //if (this.getColour() == Turn.WHITE){
 
-            doesThisPutKingInCheck = !positionsOverWhichTheKingCanBeAttacked.isEmpty();
+        //    doesThisPutKingInCheck = !positionsOverWhichTheKingCanBeAttacked.isEmpty();
             //temp.addAll(Main.whiteKing.getPositionsOverWhichTheKingCanBeAttacked());
-            Main.whiteKing.cureCheck();
-        }
-        else{
-            doesThisPutKingInCheck = Main.blackKing.getIsInCheck();
+        //    Main.whiteKing.cureCheck();
+        //}
+        //else{
+        //    doesThisPutKingInCheck = Main.blackKing.getIsInCheck();
             //temp.addAll(Main.blackKing.getPositionsOverWhichTheKingCanBeAttacked());
-            Main.blackKing.cureCheck();
-        }
+        //    Main.blackKing.cureCheck();
+        //}
+        cureCheck();
         //reverse the move
-        simpleBoard[currentX][currentY] = simpleBoard[x][y];
+        simpleBoard[fromX][fromY] = simpleBoard[x][y];
         //Now put enemy piece back in its place
         simpleBoard[x][y] = keepInMind;
+
+        //Now, let us put the king back, if he was moved
+        if (oldKingX > -1 && oldKingY > -1){
+            this.setX(oldKingX);
+            this.setY(oldKingY);
+        }
 
         //System.out.println(doesThisPutKingInCheck);
         //System.out.println("Attack positions: " + temp);
