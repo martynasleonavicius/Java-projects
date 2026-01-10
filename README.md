@@ -7,12 +7,10 @@ Projects that have been uploaded so far:
    Features:
    -Draws the chessboard with pieces
    -Enforces legal movement rules for each piece
-   -Supports turn-based gameplay and check detection.
+   -Supports turn-based gameplay and check detection
    
    Limitations:
-   -Cannot capture en passant
    -The game cannot identify if a player is in a checkmate, only a check
-   -Pawns cannot be promoted
 
    Technologies:
    -JDK17
