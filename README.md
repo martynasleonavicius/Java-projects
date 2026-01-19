@@ -1,5 +1,3 @@
-#Java-projects
-
 Hello, my name is Martynas Leonavicius and this is my first Java project.
 
 
